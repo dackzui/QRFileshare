@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Email share · QRFileshare{% endblock %}
+
+{% block content %}
+<section class="hero narrow">
+  <h1>Email ready</h1>
+  <p>Your email app should open with the message filled in.</p>
+</section>
+
+<div class="card stack">
+  <p class="muted">Send to <strong>{{ recipient }}</strong></p>
+  <p class="muted small">Before you send, attach the QR image using <strong>Download QR</strong> on the share page.</p>
+
+  <a class="btn btn-primary btn-block" href="{{ mailto_url }}">Open in my email app</a>
+  <a class="btn btn-ghost btn-block" href="{{ gmail_url }}" target="_blank" rel="noopener">Open in Gmail (browser)</a>
+  <a class="btn btn-ghost btn-block" href="{{ url_for('share_detail', link_id=link_id) }}">Back to share</a>
+</div>
+
+<script>
+  window.addEventListener("load", () => {
+    const link = document.querySelector('a[href^="mailto:"]');
+    if (link) {
+      window.location.href = link.href;
+    }
+  });
+</script>
+{% endblock %}

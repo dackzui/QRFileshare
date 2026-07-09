@@ -1,0 +1,20 @@
+    {% if link.is_available and qr_available %}
+      <div class="card">
+        <h2>Email this share</h2>
+        <p class="muted small">
+          Opens your normal email app with the links and expiry details filled in.
+          Attach the QR image using <strong>Download QR</strong> before you send.
+        </p>
+        <form method="post" action="{{ url_for('compose_share_email_route', link_id=link.id) }}" class="stack-form">
+          <label>
+            Send to
+            <input type="email" name="recipient_email" placeholder="name@example.com" required autocomplete="email">
+          </label>
+          <p class="muted small">
+            Link valid until {{ format_expiry(link) }}
+            ({{ format_time_remaining(link) }}).
+          </p>
+          <button class="btn btn-primary btn-block" type="submit">Open in my email app</button>
+        </form>
+      </div>
+    {% endif %}

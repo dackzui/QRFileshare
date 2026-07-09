@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Settings · QRFileshare{% endblock %}
+
+{% block content %}
+<section class="hero narrow">
+  <h1>Settings</h1>
+  <p>Choose cloud storage, sign in, and set your default share expiry.</p>
+  <p class="muted about-line">{{ app_name }} v{{ app_version }} · © {{ app_year }} {{ app_author }}</p>
+</section>
+
+<div class="grid two-col settings-grid">
+  <div class="card">
+    <h2>Cloud storage</h2>
+
+    <form method="post" action="{{ url_for('save_settings') }}" class="stack-form">
+      <label>
+        Default provider
+        <select name="cloud_provider" id="settings-provider-select">
+          {% for key, provider in cloud_providers.items() %}
+            <option value="{{ key }}" {% if key == selected_provider %}selected{% endif %}>{{ provider.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <p class="muted small provider-blurb" id="provider-blurb">{{ cloud_providers[selected_provider].description }}</p>
+
+      {% if show_oauth_advanced %}
+      <div class="oauth-setup" id="oauth-setup">
+        <p class="muted small" id="oauth-hint">
+          {% if selected_provider == 'google_drive' %}
+            Developer setup — only needed if Google sign-in is not bundled.
+          {% else %}
+            Developer setup — add {{ cloud_providers[selected_provider].name }} app credentials once.
+          {% endif %}
+        </p>
+        <label>
+          Client ID / App key
+          <input type="text" name="oauth_client_id" placeholder="Paste client ID or app key" autocomplete="off">
+        </label>
+        <label>
+          Client secret / App secret
+          <input type="password" name="oauth_client_secret" placeholder="Paste secret (leave blank to keep existing)" autocomplete="new-password">
+        </label>
+        <p class="muted small" id="oauth-status">
+          {% if oauth_ready[selected_provider] %}
+            Ready to sign in with {{ cloud_providers[selected_provider].name }}.
+          {% else %}
+            Save credentials below{% if selected_provider == 'google_drive' %}, or add credentials.json next to the app{% endif %}.
+          {% endif %}
+        </p>
+        {% if cloud_providers[selected_provider].dev_console_url %}
+          <a class="small-link" id="dev-console-link" href="{{ cloud_providers[selected_provider].dev_console_url }}" target="_blank" rel="noopener">Open developer console →</a>
+        {% endif %}
+      </div>
+      {% elif selected_provider == 'google_drive' and google_oauth_bundled %}
+        <p class="muted small">Google Drive sign-in is built in — no API keys needed for users.</p>
+      {% elif selected_provider == 'cloud_link' %}
+        <p class="muted small">No sign-in needed. Paste a folder URL when you create a folder on the dashboard.</p>
+      {% endif %}
+
+      {% with prefix='default_expiry', expiry_value=default_expiry_value, expiry_unit=default_expiry_unit, min_expiry=min_expiry, max_expiry=max_expiry, label='Default share expiry' %}
+        {% include "partials/expiry_fields.html" %}
+      {% endwith %}
+      <p class="muted">Share links stop working after this period. You can override minutes, hours, or days when creating each share.</p>
+      <button class="btn btn-primary" type="submit">Save settings</button>
+    </form>
+
+    {% if cloud_providers[selected_provider].auth_type == 'oauth' and oauth_ready[selected_provider] %}
+      <div class="settings-signin">
+        {% if cloud_connected and active_provider == selected_provider %}
+          <div class="connected-row">
+            <span>Signed in as <strong>{{ cloud_email }}</strong></span>
+            <form method="post" action="{{ url_for('auth_disconnect') }}">
+              <input type="hidden" name="provider" value="{{ selected_provider }}">
+              <button class="btn btn-ghost btn-sm" type="submit">Sign out</button>
+            </form>
+          </div>
+        {% else %}
+          <a class="btn btn-ghost btn-block" href="{{ url_for('auth_provider', provider=selected_provider) }}">
+            Sign in with {{ cloud_providers[selected_provider].name }}
+          </a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Network (optional)</h2>
+    <p class="muted">For phone QR scanning on your local network, set <code>BASE_URL</code> in <code>.env</code> to your PC's address, e.g. <code>http://192.168.1.10:5000</code>.</p>
+
+    {% if show_oauth_advanced or google_oauth_bundled %}
+    <h2 style="margin-top:1.25rem">Developer: OAuth redirect URIs</h2>
+    <ul class="uri-list">
+      <li><code>http://127.0.0.1:5000/auth/google_drive/callback</code></li>
+      <li><code>http://localhost:5000/auth/google_drive/callback</code></li>
+      <li><code>http://127.0.0.1:5000/auth/dropbox/callback</code></li>
+      <li><code>http://127.0.0.1:5000/auth/onedrive/callback</code></li>
+    </ul>
+    {% endif %}
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/cloud.js') }}"></script>
+{% endblock %}

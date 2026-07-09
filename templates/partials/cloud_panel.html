@@ -1,0 +1,63 @@
+<div class="card cloud-panel" id="cloud-panel">
+  <div class="card-head">
+    <h2>Cloud storage</h2>
+    {% if cloud_connected %}
+      <span class="pill pill-ok">Synced</span>
+    {% elif active_provider_info.auth_type == 'oauth' %}
+      <span class="pill pill-warn">Not signed in</span>
+    {% else %}
+      <span class="pill pill-ok">Ready</span>
+    {% endif %}
+  </div>
+
+  <form class="provider-picker" method="post" action="{{ url_for('select_cloud_provider') }}">
+    <label>
+      Storage provider
+      <select name="provider" id="cloud-provider-select">
+        {% for key, provider in cloud_providers.items() %}
+          <option value="{{ key }}" {% if key == active_provider %}selected{% endif %}>{{ provider.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn btn-ghost" type="submit">Use this provider</button>
+  </form>
+  <p class="muted provider-blurb" id="provider-blurb">{{ active_provider_info.description }}</p>
+  {% if google_oauth_bundled and active_provider == 'google_drive' %}
+    <p class="muted small">Google Drive is ready — just sign in below. No API keys needed.</p>
+  {% endif %}
+
+  <div class="cloud-actions">
+    {% if active_provider_info.auth_type == 'oauth' %}
+      {% if cloud_connected %}
+        <div class="connected-row">
+          <span>Signed in as <strong>{{ cloud_email }}</strong></span>
+          <form method="post" action="{{ url_for('auth_disconnect') }}">
+            <input type="hidden" name="provider" value="{{ active_provider }}">
+            <button class="btn btn-ghost btn-sm" type="submit">Sign out</button>
+          </form>
+        </div>
+      {% elif cloud_configured %}
+        <a class="btn btn-primary provider-signin" href="{{ url_for('auth_provider', provider=active_provider) }}">
+          Sign in with {{ active_provider_info.name }}
+        </a>
+        {% if active_provider == 'google_drive' and google_oauth_bundled %}
+          <p class="muted small">Use your normal Google login — same as signing into Drive in a browser.</p>
+        {% elif active_provider in ('dropbox', 'onedrive') %}
+          <p class="muted small">Add app credentials in Settings first, then sign in here.</p>
+        {% else %}
+          <p class="muted small">Click above to sign in with your account.</p>
+        {% endif %}
+      {% else %}
+        <div class="callout callout-warn compact">
+          {% if active_provider in ('dropbox', 'onedrive') %}
+            <p>Add {{ active_provider_info.name }} app credentials in <a href="{{ url_for('settings') }}">Settings</a>, then sign in.</p>
+          {% else %}
+            <p>Cloud sign-in is not configured in this build. Contact {{ app_author }}.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="muted small">{{ active_provider_info.setup_hint }}</p>
+    {% endif %}
+  </div>
+</div>

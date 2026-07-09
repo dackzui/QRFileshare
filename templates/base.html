@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}QRFileshare{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('dashboard') }}">
+      <span class="brand-mark">QR</span>
+      <span>QRFileshare</span>
+    </a>
+    <nav class="nav">
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('settings') }}">Settings</a>
+    </nav>
+    <div class="account">
+      {% if cloud_connected and active_provider_info.auth_type == 'oauth' %}
+        <span class="pill pill-ok">{{ active_provider_info.name }} · {{ cloud_email }}</span>
+      {% elif active_provider == 'cloud_link' %}
+        <span class="pill pill-ok">{{ active_provider_info.name }}</span>
+      {% else %}
+        <span class="pill pill-warn">Not signed in</span>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-stack">
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="app-footer">
+    <span>{{ app_name }} v{{ app_version }}</span>
+    <div class="footer-meta">
+      <span class="muted">© {{ app_year }} {{ app_author }}</span>
+      <a class="footer-link" href="{{ app_developer_url }}" target="_blank" rel="noopener">{{ app_developer_label }}</a>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Share · QRFileshare{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('dashboard') }}">Dashboard</a>
+  {% if folder %} / <a href="{{ url_for('folder_detail', folder_id=folder.id) }}">{{ folder.name }}</a>{% endif %}
+  / Share
+</div>
+
+<section class="grid two-col share-layout">
+  <div class="card qr-card">
+    <h1>{{ link.label or 'Shared folder' }}</h1>
+    <p class="muted small">QR code links directly to Google Drive.</p>
+    {% if qr_available %}
+      <img class="qr-image" src="{{ url_for('qr_image', link_id=link.id) }}" alt="QR code for {{ link.label }}">
+      <a class="btn btn-ghost btn-block" href="{{ url_for('qr_image', link_id=link.id, download=1) }}">Download QR (Canva style)</a>
+    {% else %}
+      <p class="empty">QR image not found.</p>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <h2>Share details</h2>
+      <dl class="details">
+        <div>
+          <dt>QR / Google Drive</dt>
+          <dd><a href="{{ link.target_url }}" target="_blank" rel="noopener">{{ link.target_url }}</a></dd>
+        </div>
+        <div>
+          <dt>Expiring share link</dt>
+          <dd><a href="{{ share_url }}">{{ share_url }}</a></dd>
+        </div>
+        <div>
+          <dt>Expires</dt>
+          <dd>{{ format_expiry(link) }} ({{ format_time_remaining(link) }})</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>
+            {% if link.is_available %}
+              <span class="pill pill-ok">Active</span>
+            {% else %}
+              <span class="pill pill-warn">Unavailable</span>
+            {% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt>QR theme</dt>
+          <dd>{{ qr_themes[link.qr_theme].name if link.qr_theme in qr_themes else link.qr_theme }}</dd>
+        </div>
+      </dl>
+    </div>
+
+    {% include "partials/share_email.html" %}
+
+    {% if link.is_available %}
+      <form method="post" action="{{ url_for('delete_share_route', link_id=link.id) }}" onsubmit="return confirm('Delete this share and its QR code? The folder will stay in cloud storage.');">
+        <button class="btn btn-ghost btn-block" type="submit">Delete share</button>
+      </form>
+    {% endif %}
+
+    {% if link.is_available and folder and provider_info and provider_info.supports_sync %}
+      <form method="post" action="{{ url_for('revoke_share_route', link_id=link.id) }}" onsubmit="return confirm('Revoke this share and permanently delete the folder from {{ provider_info.name }}?');">
+        <button class="btn btn-danger btn-block" type="submit">Revoke &amp; delete folder from {{ provider_info.name }}</button>
+      </form>
+    {% elif link.is_available %}
+      <form method="post" action="{{ url_for('revoke_share_route', link_id=link.id) }}">
+        <button class="btn btn-danger btn-block" type="submit">Revoke share</button>
+      </form>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
