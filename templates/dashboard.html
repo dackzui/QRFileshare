@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · QRFileshare{% endblock %}
+
+{% block content %}
+{% if update_info and update_info.available %}
+<section class="card update-banner" id="update-banner" data-version="{{ update_info.latest_version }}">
+  <div class="update-banner-body">
+    <strong>Update available</strong>
+    <p>
+      {{ app_name }} <strong>v{{ update_info.latest_version }}</strong> is ready.
+      You are on v{{ app_version }}.
+    </p>
+  </div>
+  <div class="update-banner-actions">
+    <a class="btn btn-primary btn-sm" href="{{ update_info.download_url }}" target="_blank" rel="noopener">Download update</a>
+    <button class="btn btn-ghost btn-sm" type="button" id="dismiss-update">Later</button>
+  </div>
+</section>
+{% endif %}
+
+<section class="hero">
+  <div>
+    <h1>Share folders with expiring QR codes</h1>
+    <p>Pick a cloud storage provider, sign in once, then create folders, drop files, and share with Canva-style QR codes. Default expiry: <strong>{{ format_duration(default_expiry_value, default_expiry_unit) }}</strong>.</p>
+  </div>
+</section>
+
+{% include "partials/cloud_panel.html" %}
+
+{% if active_provider == 'cloud_link' or cloud_connected %}
+<section class="card create-folder">
+  <h2>New folder</h2>
+  <form method="post" action="{{ url_for('create_folder') }}">
+    <input type="hidden" name="provider" value="{{ active_provider }}">
+    <div class="row">
+      <input type="text" name="name" placeholder="Project files, Team dropbox…" required>
+      {% if active_provider == 'cloud_link' %}
+        <input type="url" name="folder_url" placeholder="https://drive.google.com/... or any folder link" required>
+        <button class="btn btn-primary" type="submit">Add folder link</button>
+      {% else %}
+        <button class="btn btn-primary" type="submit">Create in {{ active_provider_info.name }}</button>
+      {% endif %}
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<section class="card sync-panel">
+  <div class="card-head">
+    <div>
+      <h2>Cloud sync</h2>
+      <p class="muted sync-hint">Remove folders and shares from the app when they were deleted in cloud storage.</p>
+    </div>
+    <form method="post" action="{{ url_for('refresh_cloud_route') }}">
+      <button class="btn btn-ghost btn-sm" type="submit">Refresh</button>
+    </form>
+  </div>
+</section>
+
+<section class="grid two-col">
+  <div class="card">
+    <div class="card-head">
+      <h2>Folders</h2>
+      <span class="muted">{{ folders|length }} total</span>
+    </div>
+    {% if folders %}
+      <ul class="list">
+        {% for folder in folders %}
+          <li class="list-row">
+            <a href="{{ url_for('folder_detail', folder_id=folder.id) }}">
+              <strong>{{ folder.name }}</strong>
+              <span class="muted">{{ cloud_providers[folder.provider].name }} →</span>
+            </a>
+            <form method="post" action="{{ url_for('delete_folder_route', folder_id=folder.id) }}" class="inline-delete-form" onsubmit="return confirm('Delete folder &quot;{{ folder.name }}&quot; from the app?{% if cloud_providers[folder.provider].supports_sync %} Check the box below to also delete it from {{ cloud_providers[folder.provider].name }}.{% endif %}');">
+              {% if cloud_providers[folder.provider].supports_sync %}
+                <label class="inline-checkbox">
+                  <input type="checkbox" name="delete_from_cloud">
+                  <span>Cloud</span>
+                </label>
+              {% endif %}
+              <button class="btn btn-ghost btn-sm btn-danger-text" type="submit">Delete</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">No folders yet. Connect cloud storage and create one.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Active shares</h2>
+      <span class="muted">{{ shares|length }} live</span>
+    </div>
+    {% if shares %}
+      <ul class="list">
+        {% for share in shares %}
+          <li class="list-row">
+            <a href="{{ url_for('share_detail', link_id=share.id) }}">
+              <strong>{{ share.label or 'Shared link' }}</strong>
+              <span class="muted">Expires {{ format_expiry(share) }} · {{ format_time_remaining(share) }}</span>
+            </a>
+            <form method="post" action="{{ url_for('delete_share_route', link_id=share.id) }}" class="inline-delete-form" onsubmit="return confirm('Delete this share and its QR code? The folder will stay in cloud storage.');">
+              <button class="btn btn-ghost btn-sm btn-danger-text" type="submit">Delete</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">Share a folder to generate a QR code.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card cleanup-panel">
+  <h2>Bulk delete by date</h2>
+  <p class="muted">Delete folders and/or active shares created within a date range. Cloud deletion applies to folders you delete, or to cloud folders linked to shares you delete.</p>
+  <form method="post" action="{{ url_for('bulk_cleanup_route') }}" class="stack-form cleanup-form" onsubmit="return confirm('Delete the selected items in this date range? This cannot be undone.');">
+    <div class="date-range-row">
+      <label>
+        From
+        <input type="date" name="from_date" value="{{ today_iso }}" required>
+      </label>
+      <label>
+        To
+        <input type="date" name="to_date" value="{{ today_iso }}" required>
+      </label>
+    </div>
+    <div class="checkbox-group">
+      <label class="checkbox-row">
+        <input type="checkbox" name="delete_folders" checked>
+        Delete folders created in this range
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" name="delete_shares">
+        Delete active shares created in this range
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" name="delete_from_cloud">
+        Also delete linked folders from cloud storage (Google Drive, etc.)
+      </label>
+    </div>
+    <button class="btn btn-danger" type="submit">Delete selected</button>
+  </form>
+</section>
+
+<script src="{{ url_for('static', filename='js/cloud.js') }}"></script>
+{% if update_info and update_info.available %}
+<script src="{{ url_for('static', filename='js/update.js') }}"></script>
+{% endif %}
+{% endblock %}

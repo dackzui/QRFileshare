@@ -1,0 +1,18 @@
+<label class="expiry-field">
+  {{ label or "Expires in" }}
+  <div class="expiry-input-row">
+    <input
+      type="number"
+      name="{{ prefix }}_value"
+      min="{{ min_expiry }}"
+      max="{{ max_expiry }}"
+      value="{{ expiry_value }}"
+      required
+    >
+    <select name="{{ prefix }}_unit">
+      <option value="minutes" {% if expiry_unit == 'minutes' %}selected{% endif %}>Minutes</option>
+      <option value="hours" {% if expiry_unit == 'hours' %}selected{% endif %}>Hours</option>
+      <option value="days" {% if expiry_unit == 'days' %}selected{% endif %}>Days</option>
+    </select>
+  </div>
+</label>
