@@ -184,12 +184,20 @@ input, select, button {
 
 input[type="text"],
 input[type="number"],
-select {
+input[type="email"],
+select,
+textarea {
   width: 100%;
   padding: 0.8rem 0.9rem;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+  font: inherit;
 }
 
 label {

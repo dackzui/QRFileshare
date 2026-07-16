@@ -20,22 +20,36 @@ def is_valid_email(address: str) -> bool:
     return bool(EMAIL_RE.match((address or "").strip()))
 
 
+def default_sender_name() -> str:
+    return str(get_app_info()["app_author"])
+
+
+def default_email_intro(sender_label: str | None = None) -> str:
+    info = get_app_info()
+    sender = (sender_label or "").strip() or str(info["app_author"])
+    app_name = str(info["app_name"])
+    return f"{sender} has shared a folder with you via {app_name}."
+
+
 def build_share_email_body(
     *,
     link: ShareLink,
     share_url: str,
     sender_label: str | None = None,
+    intro_text: str | None = None,
+    subject: str | None = None,
 ) -> tuple[str, str]:
     info = get_app_info()
-    sender_label = sender_label or str(info["app_author"])
+    sender_label = (sender_label or "").strip() or str(info["app_author"])
     app_name = str(info["app_name"])
     title = link.label or "Shared folder"
-    subject = f"{title} — shared via {app_name}"
+    subject_line = (subject or "").strip() or f"{title} — shared via {app_name}"
+    intro = (intro_text or "").strip() or default_email_intro(sender_label)
     expiry_line = format_expiry(link)
     time_left = link.time_remaining
     body = f"""Hello,
 
-{sender_label} has shared a folder with you via {app_name}.
+{intro}
 
 Folder: {title}
 
@@ -51,7 +65,7 @@ Please attach the QR code image before sending.
 —
 {app_name}
 """
-    return subject, body
+    return subject_line, body
 
 
 def build_mailto_url(to_email: str, subject: str, body: str) -> str:
@@ -77,16 +91,20 @@ def compose_share_email(
     link: ShareLink,
     share_url: str,
     sender_label: str | None = None,
+    intro_text: str | None = None,
+    subject: str | None = None,
 ) -> tuple[str, str, str]:
     to_email = to_email.strip()
     if not is_valid_email(to_email):
         raise EmailComposeError("Enter a valid email address.")
 
-    subject, body = build_share_email_body(
+    subject_line, body = build_share_email_body(
         link=link,
         share_url=share_url,
         sender_label=sender_label,
+        intro_text=intro_text,
+        subject=subject,
     )
-    mailto_url = build_mailto_url(to_email, subject, body)
-    gmail_url = build_gmail_compose_url(to_email, subject, body)
-    return mailto_url, gmail_url, subject
+    mailto_url = build_mailto_url(to_email, subject_line, body)
+    gmail_url = build_gmail_compose_url(to_email, subject_line, body)
+    return mailto_url, gmail_url, subject_line

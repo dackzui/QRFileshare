@@ -216,6 +216,16 @@ class DataStore:
         if unit == "days":
             self.set_setting("default_expiry_days", str(value))
 
+    def get_email_sender_name(self) -> str:
+        return self.get_setting("email_sender_name", "").strip()
+
+    def get_email_intro_text(self) -> str:
+        return self.get_setting("email_intro_text", "").strip()
+
+    def set_email_preferences(self, sender_name: str, intro_text: str) -> None:
+        self.set_setting("email_sender_name", sender_name.strip())
+        self.set_setting("email_intro_text", intro_text.strip())
+
     def save_oauth_token(self, provider: str, token_json: str, email: str = "") -> None:
         with self._connect() as conn:
             conn.execute(

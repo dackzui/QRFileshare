@@ -9,7 +9,7 @@ from pathlib import Path
 _PROJECT_FILE = Path(__file__).resolve()
 
 APP_NAME = "QRFileshare"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.5.0"
 APP_AUTHOR = "Marie Apellanes"
 APP_YEAR = 2026
 APP_DEVELOPER_URL = "https://apellanes.com.au"

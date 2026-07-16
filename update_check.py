@@ -92,9 +92,21 @@ def _load_cache(store: DataStore) -> Optional[UpdateInfo]:
         checked_at = float(payload.get("checked_at", 0))
         if time.time() - checked_at > CACHE_TTL_SECONDS:
             return None
+
+        cached_repo = _normalize_repo(str(payload.get("repo", "")))
+        if cached_repo and cached_repo != _github_repo():
+            return None
+
+        latest_version = str(payload.get("latest_version", ""))
+        if not latest_version:
+            return None
+
+        current_version = str(get_app_info()["app_version"])
+        available = _is_newer(latest_version, current_version)
+
         return UpdateInfo(
-            available=bool(payload.get("available")),
-            latest_version=str(payload.get("latest_version", "")),
+            available=available,
+            latest_version=latest_version,
             download_url=str(payload.get("download_url", "")),
             release_url=str(payload.get("release_url", "")),
             release_notes=str(payload.get("release_notes", "")),
@@ -103,9 +115,11 @@ def _load_cache(store: DataStore) -> Optional[UpdateInfo]:
         return None
 
 
-def _save_cache(store: DataStore, info: UpdateInfo) -> None:
+def _save_cache(store: DataStore, info: UpdateInfo, *, current_version: str, repo: str) -> None:
     payload = {
         "checked_at": time.time(),
+        "repo": repo,
+        "current_version": current_version,
         "available": info.available,
         "latest_version": info.latest_version,
         "download_url": info.download_url,
@@ -143,5 +157,5 @@ def check_for_update(store: DataStore, *, force: bool = False) -> Optional[Updat
         release_url=release_url,
         release_notes=str(release.get("body", "")).strip(),
     )
-    _save_cache(store, info)
+    _save_cache(store, info, current_version=current_version, repo=repo)
     return info

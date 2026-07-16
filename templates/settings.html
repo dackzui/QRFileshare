@@ -61,6 +61,17 @@
         {% include "partials/expiry_fields.html" %}
       {% endwith %}
       <p class="muted">Share links stop working after this period. You can override minutes, hours, or days when creating each share.</p>
+
+      <h2>Share email</h2>
+      <label>
+        Introduction (after “Hello,”)
+        <textarea name="email_intro_text" rows="3" maxlength="500">{{ email_intro_text }}</textarea>
+      </label>
+      <p class="muted small">
+        This exact sentence goes into the email body. Folder link and expiry are added automatically.
+        You can still edit it on each share before sending.
+      </p>
+
       <button class="btn btn-primary" type="submit">Save settings</button>
     </form>
 

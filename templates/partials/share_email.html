@@ -10,7 +10,12 @@
             Send to
             <input type="email" name="recipient_email" placeholder="name@example.com" required autocomplete="email">
           </label>
+          <label>
+            Introduction (after “Hello,”)
+            <textarea name="email_intro_text" rows="3" maxlength="500">{{ email_intro_text }}</textarea>
+          </label>
           <p class="muted small">
+            Folder link and expiry details are added automatically.
             Link valid until {{ format_expiry(link) }}
             ({{ format_time_remaining(link) }}).
           </p>

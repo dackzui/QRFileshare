@@ -23,7 +23,12 @@ from config import (
     SECRET_KEY,
 )
 from database import DataStore
-from email_compose import EmailComposeError, compose_share_email
+from email_compose import (
+    EmailComposeError,
+    compose_share_email,
+    default_email_intro,
+    default_sender_name,
+)
 from qr_generator import QR_THEMES, build_share_url, default_qr_path, ensure_qr_image
 from file_service import delete_folder_files
 from expiry import ExpiryError, expiry_limits, format_duration, parse_expiry_form
@@ -161,6 +166,8 @@ def create_app() -> Flask:
             oauth_ready=oauth_ready,
             google_oauth_bundled=is_google_oauth_bundled(),
             show_oauth_advanced=show_oauth_advanced,
+            email_intro_text=store.get_email_intro_text()
+            or default_email_intro(store.get_email_sender_name() or default_sender_name()),
         )
 
     @app.post("/settings")
@@ -179,6 +186,11 @@ def create_app() -> Flask:
             cloud.set_active_provider(provider)
 
         store.set_default_expiry(default_value, default_unit)
+
+        sender_name = (request.form.get("email_sender_name") or "").strip()
+        intro_text = (request.form.get("email_intro_text") or "").strip()
+        # Keep any previously saved sender name; intro text is the visible email customisation.
+        store.set_email_preferences(sender_name or store.get_email_sender_name(), intro_text)
 
         client_id = (request.form.get("oauth_client_id") or "").strip()
         client_secret = (request.form.get("oauth_client_secret") or "").strip()
@@ -557,6 +569,8 @@ def create_app() -> Flask:
             share_url=build_share_url(BASE_URL, link.id),
             qr_available=qr_available,
             format_expiry=format_expiry,
+            email_intro_text=store.get_email_intro_text()
+            or default_email_intro(store.get_email_sender_name() or default_sender_name()),
         )
 
     @app.post("/shares/<link_id>/compose-email")
@@ -569,13 +583,15 @@ def create_app() -> Flask:
             return redirect(url_for("share_detail", link_id=link_id))
 
         to_email = (request.form.get("recipient_email") or "").strip()
+        intro_text = (request.form.get("email_intro_text") or "").strip()
         share_url = build_share_url(BASE_URL, link.id)
         try:
             mailto_url, gmail_url, _subject = compose_share_email(
                 to_email=to_email,
                 link=link,
                 share_url=share_url,
-                sender_label=str(get_app_info()["app_author"]),
+                sender_label=store.get_email_sender_name() or default_sender_name(),
+                intro_text=intro_text or None,
             )
         except EmailComposeError as exc:
             flash(str(exc), "error")
