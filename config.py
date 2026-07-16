@@ -38,6 +38,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev-change-me-in-production")
 DEFAULT_EXPIRY_DAYS = int(os.getenv("DEFAULT_EXPIRY_DAYS", "30"))
 DATABASE_PATH = _resolve_app_path("DATABASE_PATH", APP_DIR / "data" / "links.db")
 QR_OUTPUT_DIR = _resolve_app_path("QR_OUTPUT_DIR", APP_DIR / "output" / "qr")
+QR_ASSETS_DIR = _resolve_app_path("QR_ASSETS_DIR", APP_DIR / "output" / "qr_assets")
 GOOGLE_CREDENTIALS_FILE = _resolve_app_path(
     "GOOGLE_CREDENTIALS_FILE", APP_DIR / "credentials.json"
 )
@@ -68,4 +69,5 @@ GOOGLE_SCOPES = [
 ]
 
 QR_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+QR_ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)

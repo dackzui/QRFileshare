@@ -34,6 +34,10 @@ class ShareLink:
     expires_at: datetime
     is_active: bool
     qr_theme: str = "canva-classic"
+    qr_logo_path: str = ""
+    qr_logo_placement: str = "none"
+    qr_border_style: str = "none"
+    qr_border_path: str = ""
 
     @property
     def is_expired(self) -> bool:
@@ -129,6 +133,10 @@ class DataStore:
             )
             self._ensure_column(conn, "share_links", "folder_id", "TEXT")
             self._ensure_column(conn, "share_links", "qr_theme", "TEXT NOT NULL DEFAULT 'canva-classic'")
+            self._ensure_column(conn, "share_links", "qr_logo_path", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "share_links", "qr_logo_placement", "TEXT NOT NULL DEFAULT 'none'")
+            self._ensure_column(conn, "share_links", "qr_border_style", "TEXT NOT NULL DEFAULT 'none'")
+            self._ensure_column(conn, "share_links", "qr_border_path", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(conn, "folders", "provider", "TEXT NOT NULL DEFAULT 'google_drive'")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at)"
@@ -226,6 +234,29 @@ class DataStore:
         self.set_setting("email_sender_name", sender_name.strip())
         self.set_setting("email_intro_text", intro_text.strip())
 
+    def get_branding(self) -> dict[str, str]:
+        logo_placement = self.get_setting("branding_logo_placement", "none").strip() or "none"
+        border_style = self.get_setting("branding_border_style", "none").strip() or "none"
+        return {
+            "logo_path": self.get_setting("branding_logo_path", "").strip(),
+            "logo_placement": logo_placement,
+            "border_style": border_style,
+            "border_path": self.get_setting("branding_border_path", "").strip(),
+        }
+
+    def set_branding(
+        self,
+        *,
+        logo_placement: str = "none",
+        border_style: str = "none",
+        logo_path: str = "",
+        border_path: str = "",
+    ) -> None:
+        self.set_setting("branding_logo_placement", logo_placement.strip() or "none")
+        self.set_setting("branding_border_style", border_style.strip() or "none")
+        self.set_setting("branding_logo_path", logo_path.strip())
+        self.set_setting("branding_border_path", border_path.strip())
+
     def save_oauth_token(self, provider: str, token_json: str, email: str = "") -> None:
         with self._connect() as conn:
             conn.execute(
@@ -301,6 +332,7 @@ class DataStore:
         return [self._row_to_folder(row) for row in rows]
 
     def _row_to_link(self, row: sqlite3.Row) -> ShareLink:
+        keys = row.keys()
         return ShareLink(
             id=row["id"],
             target_url=row["target_url"],
@@ -310,6 +342,12 @@ class DataStore:
             expires_at=_from_iso(row["expires_at"]),
             is_active=bool(row["is_active"]),
             qr_theme=row["qr_theme"] or "canva-classic",
+            qr_logo_path=(row["qr_logo_path"] if "qr_logo_path" in keys else "") or "",
+            qr_logo_placement=(row["qr_logo_placement"] if "qr_logo_placement" in keys else "none")
+            or "none",
+            qr_border_style=(row["qr_border_style"] if "qr_border_style" in keys else "none")
+            or "none",
+            qr_border_path=(row["qr_border_path"] if "qr_border_path" in keys else "") or "",
         )
 
     def create_link(
@@ -321,6 +359,10 @@ class DataStore:
         label: str = "",
         folder_id: Optional[str] = None,
         qr_theme: str = "canva-classic",
+        qr_logo_path: str = "",
+        qr_logo_placement: str = "none",
+        qr_border_style: str = "none",
+        qr_border_path: str = "",
     ) -> ShareLink:
         link_id = secrets.token_urlsafe(8)
         created_at = _utc_now()
@@ -335,8 +377,9 @@ class DataStore:
             conn.execute(
                 """
                 INSERT INTO share_links
-                    (id, target_url, label, folder_id, created_at, expires_at, is_active, qr_theme)
-                VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+                    (id, target_url, label, folder_id, created_at, expires_at, is_active,
+                     qr_theme, qr_logo_path, qr_logo_placement, qr_border_style, qr_border_path)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
                 """,
                 (
                     link_id,
@@ -346,6 +389,10 @@ class DataStore:
                     _to_iso(created_at),
                     _to_iso(expires_at),
                     qr_theme,
+                    qr_logo_path,
+                    qr_logo_placement,
+                    qr_border_style,
+                    qr_border_path,
                 ),
             )
 
@@ -358,12 +405,44 @@ class DataStore:
             expires_at=expires_at,
             is_active=True,
             qr_theme=qr_theme,
+            qr_logo_path=qr_logo_path,
+            qr_logo_placement=qr_logo_placement,
+            qr_border_style=qr_border_style,
+            qr_border_path=qr_border_path,
         )
 
     def get_link(self, link_id: str) -> Optional[ShareLink]:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM share_links WHERE id = ?", (link_id,)).fetchone()
         return self._row_to_link(row) if row else None
+
+    def update_link_qr_style(
+        self,
+        link_id: str,
+        *,
+        qr_logo_path: str = "",
+        qr_logo_placement: str = "none",
+        qr_border_style: str = "none",
+        qr_border_path: str = "",
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE share_links
+                SET qr_logo_path = ?,
+                    qr_logo_placement = ?,
+                    qr_border_style = ?,
+                    qr_border_path = ?
+                WHERE id = ?
+                """,
+                (
+                    qr_logo_path,
+                    qr_logo_placement,
+                    qr_border_style,
+                    qr_border_path,
+                    link_id,
+                ),
+            )
 
     def list_links(
         self, include_inactive: bool = False, folder_id: Optional[str] = None

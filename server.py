@@ -1,6 +1,7 @@
 from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for
 
 from datetime import date
+from pathlib import Path
 
 from cleanup_service import (
     bulk_delete_by_date,
@@ -29,7 +30,18 @@ from email_compose import (
     default_email_intro,
     default_sender_name,
 )
-from qr_generator import QR_THEMES, build_share_url, default_qr_path, ensure_qr_image
+from qr_generator import (
+    BORDER_STYLES,
+    LOGO_PLACEMENTS,
+    QR_THEMES,
+    QrAssetError,
+    brand_image_bytes,
+    build_share_url,
+    default_branding_dir,
+    default_qr_path,
+    ensure_qr_image,
+    save_png_upload,
+)
 from file_service import delete_folder_files
 from expiry import ExpiryError, expiry_limits, format_duration, parse_expiry_form
 from share_service import (
@@ -118,6 +130,8 @@ def create_app() -> Flask:
                 "format_duration": format_duration,
                 "format_time_remaining": format_time_remaining,
                 "qr_themes": QR_THEMES,
+                "logo_placements": LOGO_PLACEMENTS,
+                "border_styles": BORDER_STYLES,
             }
         )
         return ctx
@@ -137,6 +151,16 @@ def create_app() -> Flask:
             build_share_url=lambda link_id: build_share_url(BASE_URL, link_id),
             today_iso=date.today().isoformat(),
         )
+
+    @app.get("/settings/branding/<kind>.png")
+    def branding_asset(kind: str):
+        if kind not in ("logo", "border"):
+            abort(404)
+        branding = store.get_branding()
+        path = Path(branding.get(f"{kind}_path", ""))
+        if not path.exists():
+            abort(404)
+        return send_file(path, mimetype="image/png")
 
     @app.get("/settings")
     def settings():
@@ -168,6 +192,15 @@ def create_app() -> Flask:
             show_oauth_advanced=show_oauth_advanced,
             email_intro_text=store.get_email_intro_text()
             or default_email_intro(store.get_email_sender_name() or default_sender_name()),
+            branding=store.get_branding(),
+            logo_exists=bool(
+                store.get_branding().get("logo_path")
+                and Path(store.get_branding()["logo_path"]).exists()
+            ),
+            border_exists=bool(
+                store.get_branding().get("border_path")
+                and Path(store.get_branding()["border_path"]).exists()
+            ),
         )
 
     @app.post("/settings")
@@ -191,6 +224,63 @@ def create_app() -> Flask:
         intro_text = (request.form.get("email_intro_text") or "").strip()
         # Keep any previously saved sender name; intro text is the visible email customisation.
         store.set_email_preferences(sender_name or store.get_email_sender_name(), intro_text)
+
+        logo_placement = (request.form.get("logo_placement") or "none").strip().lower()
+        if logo_placement not in LOGO_PLACEMENTS:
+            logo_placement = "none"
+        border_style = (request.form.get("border_style") or "none").strip().lower()
+        if border_style not in BORDER_STYLES:
+            border_style = "none"
+
+        branding_dir = default_branding_dir()
+        current = store.get_branding()
+        logo_path = current.get("logo_path", "")
+        border_path = current.get("border_path", "")
+        clear_logo = request.form.get("clear_logo") == "on"
+        clear_border = request.form.get("clear_border") == "on"
+
+        try:
+            logo_file = request.files.get("logo_png")
+            if logo_file and logo_file.filename:
+                dest = branding_dir / "logo.png"
+                save_png_upload(logo_file, dest, kind="logo")
+                logo_path = str(dest)
+                if logo_placement == "none":
+                    logo_placement = "center"
+            elif clear_logo:
+                if logo_path:
+                    Path(logo_path).unlink(missing_ok=True)
+                logo_path = ""
+                logo_placement = "none"
+
+            border_file = request.files.get("border_png")
+            if border_style == "custom":
+                if border_file and border_file.filename:
+                    dest = branding_dir / "border.png"
+                    save_png_upload(border_file, dest, kind="border")
+                    border_path = str(dest)
+                elif clear_border:
+                    if border_path:
+                        Path(border_path).unlink(missing_ok=True)
+                    border_path = ""
+                elif not border_path or not Path(border_path).exists():
+                    raise QrAssetError(
+                        "Upload a PNG border file for Custom border, or choose a built-in border."
+                    )
+            else:
+                if clear_border and border_path:
+                    Path(border_path).unlink(missing_ok=True)
+                border_path = ""
+
+            store.set_branding(
+                logo_placement=logo_placement if logo_path else "none",
+                border_style=border_style,
+                logo_path=logo_path,
+                border_path=border_path,
+            )
+        except QrAssetError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("settings"))
 
         client_id = (request.form.get("oauth_client_id") or "").strip()
         client_secret = (request.form.get("oauth_client_secret") or "").strip()
@@ -373,27 +463,53 @@ def create_app() -> Flask:
             return redirect(url_for("folder_detail", folder_id=folder_id))
 
         uploaded = 0
+        branded_count = 0
         errors: list[str] = []
+        branding = store.get_branding()
         for item in uploads:
             if not item or not item.filename:
                 continue
             content = item.read()
             if not content:
                 continue
+            filename = item.filename
+            mime_type = item.mimetype or "application/octet-stream"
             try:
+                branded_bytes, branded_mime = brand_image_bytes(
+                    content,
+                    filename,
+                    logo_path=branding.get("logo_path") or None,
+                    logo_placement=branding.get("logo_placement", "none"),
+                    border_style=branding.get("border_style", "none"),
+                    border_path=branding.get("border_path") or None,
+                )
+                if branded_mime:
+                    content = branded_bytes
+                    mime_type = branded_mime
+                    # Keep a .png extension when we re-encode branded images.
+                    stem = Path(filename).stem
+                    filename = f"{stem}.png"
+                    branded_count += 1
                 cloud.upload_file(
                     folder.provider,
                     folder.drive_folder_id,
-                    item.filename,
+                    filename,
                     content,
-                    item.mimetype or "application/octet-stream",
+                    mime_type,
                 )
                 uploaded += 1
             except Exception as exc:
                 errors.append(f"{item.filename}: {exc}")
 
         if uploaded:
-            flash(f"Uploaded {uploaded} file(s) to {folder.name}.", "success")
+            if branded_count:
+                flash(
+                    f"Uploaded {uploaded} file(s) to {folder.name} "
+                    f"({branded_count} image{'s' if branded_count != 1 else ''} branded).",
+                    "success",
+                )
+            else:
+                flash(f"Uploaded {uploaded} file(s) to {folder.name}.", "success")
         if errors:
             flash("Some uploads failed: " + "; ".join(errors[:3]), "error")
         if not uploaded and not errors:
@@ -457,6 +573,18 @@ def create_app() -> Flask:
             return redirect(url_for("folder_detail", folder_id=folder_id))
 
         theme = request.form.get("qr_theme", "canva-classic")
+        branding = store.get_branding()
+        logo_path = branding.get("logo_path", "")
+        border_path = branding.get("border_path", "")
+        logo_placement = branding.get("logo_placement", "none")
+        border_style = branding.get("border_style", "none")
+        if logo_path and not Path(logo_path).exists():
+            logo_path = ""
+            logo_placement = "none"
+        if border_style == "custom" and (not border_path or not Path(border_path).exists()):
+            border_style = "none"
+            border_path = ""
+
         result = create_share(
             store,
             target_url=folder.drive_url,
@@ -464,6 +592,10 @@ def create_app() -> Flask:
             folder=folder,
             expiry_duration=duration,
             qr_theme=theme,
+            qr_logo_path=logo_path,
+            qr_logo_placement=logo_placement if logo_path else "none",
+            qr_border_style=border_style,
+            qr_border_path=border_path if border_style == "custom" else "",
         )
         flash(
             format_share_expiry_message(
@@ -491,19 +623,23 @@ def create_app() -> Flask:
             flash(message, "success")
         except ValueError as exc:
             flash(str(exc), "error")
-        return redirect(request.referrer or url_for("dashboard"))
+        # Always return to the dashboard — the folder page no longer exists.
+        return redirect(url_for("dashboard"))
 
     @app.post("/shares/<link_id>/delete")
     def delete_share_route(link_id: str):
         link = store.get_link(link_id)
         if not link:
             abort(404)
+        folder_id = link.folder_id
         try:
             message = delete_share_only(store, link_id)
             flash(message, "success")
         except ValueError as exc:
             flash(str(exc), "error")
-        return redirect(request.referrer or url_for("dashboard"))
+        if folder_id and store.get_folder(folder_id):
+            return redirect(url_for("folder_detail", folder_id=folder_id))
+        return redirect(url_for("dashboard"))
 
     @app.post("/sync/refresh")
     def refresh_cloud_route():
@@ -557,6 +693,10 @@ def create_app() -> Flask:
                 target_url=link.target_url,
                 label=link.label,
                 theme=link.qr_theme,
+                logo_path=link.qr_logo_path or None,
+                logo_placement=link.qr_logo_placement,
+                border_style=link.qr_border_style,
+                border_path=link.qr_border_path or None,
             )
             qr_available = True
         except Exception:
@@ -616,6 +756,10 @@ def create_app() -> Flask:
                 target_url=link.target_url,
                 label=link.label,
                 theme=link.qr_theme,
+                logo_path=link.qr_logo_path or None,
+                logo_placement=link.qr_logo_placement,
+                border_style=link.qr_border_style,
+                border_path=link.qr_border_path or None,
             )
         except Exception:
             path = default_qr_path(link_id)

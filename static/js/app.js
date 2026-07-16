@@ -132,3 +132,22 @@ function initFileDeleteControls() {
 }
 
 initFileDeleteControls();
+
+(function initQrAssetControls() {
+  const borderStyle = document.getElementById("border-style");
+  const borderWrap = document.getElementById("border-upload-wrap");
+  const borderInput = document.getElementById("border-png");
+  if (!borderStyle || !borderWrap) return;
+
+  const syncBorderUpload = () => {
+    const custom = borderStyle.value === "custom";
+    borderWrap.hidden = !custom;
+    if (borderInput) {
+      borderInput.required = custom;
+      if (!custom) borderInput.value = "";
+    }
+  };
+
+  borderStyle.addEventListener("change", syncBorderUpload);
+  syncBorderUpload();
+})();

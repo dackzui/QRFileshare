@@ -97,7 +97,7 @@
     <div class="card share-panel">
       <h2>Share with QR code</h2>
       <p class="muted">Default expiry: <strong>{{ format_duration(default_expiry_value, default_expiry_unit) }}</strong>. Override below if needed.</p>
-      <form method="post" action="{{ url_for('share_folder', folder_id=folder.id) }}">
+      <form method="post" action="{{ url_for('share_folder', folder_id=folder.id) }}" class="stack-form">
         {% with prefix='expiry', expiry_value=default_expiry_value, expiry_unit=default_expiry_unit, min_expiry=min_expiry, max_expiry=max_expiry %}
           {% include "partials/expiry_fields.html" %}
         {% endwith %}
@@ -109,6 +109,10 @@
             {% endfor %}
           </select>
         </label>
+        <p class="muted small">
+          Logo and border come from <a href="{{ url_for('settings') }}">Settings</a>
+          and are applied to QR codes and uploaded images.
+        </p>
         <button class="btn btn-primary btn-block" type="submit">Generate share link &amp; QR</button>
       </form>
     </div>
@@ -156,5 +160,5 @@
   </div>
 </section>
 
-<script src="{{ url_for('static', filename='js/app.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v=4"></script>
 {% endblock %}

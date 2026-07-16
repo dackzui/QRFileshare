@@ -50,6 +50,20 @@
           <dt>QR theme</dt>
           <dd>{{ qr_themes[link.qr_theme].name if link.qr_theme in qr_themes else link.qr_theme }}</dd>
         </div>
+        <div>
+          <dt>Logo</dt>
+          <dd>
+            {% if link.qr_logo_path %}
+              {{ logo_placements.get(link.qr_logo_placement, link.qr_logo_placement) }}
+            {% else %}
+              None
+            {% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt>Border</dt>
+          <dd>{{ border_styles.get(link.qr_border_style, link.qr_border_style) }}</dd>
+        </div>
       </dl>
     </div>
 

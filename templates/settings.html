@@ -12,7 +12,7 @@
   <div class="card">
     <h2>Cloud storage</h2>
 
-    <form method="post" action="{{ url_for('save_settings') }}" class="stack-form">
+    <form method="post" action="{{ url_for('save_settings') }}" class="stack-form" enctype="multipart/form-data">
       <label>
         Default provider
         <select name="cloud_provider" id="settings-provider-select">
@@ -72,6 +72,51 @@
         You can still edit it on each share before sending.
       </p>
 
+      <h2>Logo &amp; border branding</h2>
+      <p class="muted small">
+        These defaults are used on every QR code and applied to images uploaded to cloud folders (PNG/JPG/WebP, etc.).
+      </p>
+      <label>
+        Logo (PNG only)
+        <input type="file" name="logo_png" accept="image/png,.png">
+      </label>
+      {% if logo_exists %}
+        <p class="muted small">A logo is saved.
+          <label class="checkbox-row inline-check">
+            <input type="checkbox" name="clear_logo"> Remove logo
+          </label>
+        </p>
+        <img class="branding-preview" src="{{ url_for('branding_asset', kind='logo') }}" alt="Saved logo">
+      {% endif %}
+      <label>
+        Logo placement
+        <select name="logo_placement" id="logo-placement">
+          {% for key, label in logo_placements.items() %}
+            <option value="{{ key }}" {% if branding.logo_placement == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Border
+        <select name="border_style" id="border-style">
+          {% for key, label in border_styles.items() %}
+            <option value="{{ key }}" {% if branding.border_style == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label id="border-upload-wrap" {% if branding.border_style != 'custom' %}hidden{% endif %}>
+        Custom border (PNG only)
+        <input type="file" name="border_png" accept="image/png,.png" id="border-png">
+      </label>
+      {% if border_exists %}
+        <p class="muted small">A custom border PNG is saved.
+          <label class="checkbox-row inline-check">
+            <input type="checkbox" name="clear_border"> Remove custom border
+          </label>
+        </p>
+        <img class="branding-preview" src="{{ url_for('branding_asset', kind='border') }}" alt="Saved border">
+      {% endif %}
+
       <button class="btn btn-primary" type="submit">Save settings</button>
     </form>
 
@@ -111,4 +156,5 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/cloud.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v=5"></script>
 {% endblock %}

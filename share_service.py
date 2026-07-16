@@ -25,6 +25,10 @@ def create_share(
     expiry_unit: str | None = None,
     expiry_duration=None,
     qr_theme: str = "canva-classic",
+    qr_logo_path: str = "",
+    qr_logo_placement: str = "none",
+    qr_border_style: str = "none",
+    qr_border_path: str = "",
     base_url: str | None = None,
 ) -> ShareResult:
     from config import BASE_URL
@@ -45,10 +49,23 @@ def create_share(
         label=label or (folder.name if folder else ""),
         folder_id=folder.id if folder else None,
         qr_theme=qr_theme,
+        qr_logo_path=qr_logo_path,
+        qr_logo_placement=qr_logo_placement,
+        qr_border_style=qr_border_style,
+        qr_border_path=qr_border_path,
     )
     share_url = build_share_url(base_url or BASE_URL, link.id)
     qr_path = default_qr_path(link.id)
-    generate_qr_image(target_url, qr_path, label=link.label, theme=qr_theme)
+    generate_qr_image(
+        target_url,
+        qr_path,
+        label=link.label,
+        theme=qr_theme,
+        logo_path=qr_logo_path or None,
+        logo_placement=qr_logo_placement,
+        border_style=qr_border_style,
+        border_path=qr_border_path or None,
+    )
     return ShareResult(link=link, share_url=share_url, qr_path=qr_path)
 
 
