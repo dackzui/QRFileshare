@@ -1,4 +1,4 @@
-QRFileshare v1.7.0
+QRFileshare v1.7.1
 © 2026 Marie Apellanes
 
 Share Google Drive folders with QR codes.

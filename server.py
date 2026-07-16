@@ -53,7 +53,7 @@ from share_service import (
     revoke_share,
 )
 from sync_service import refresh_from_cloud
-from update_check import check_for_update
+from update_check import check_for_update, clear_update_cache
 from version_info import get_app_info
 
 from oauth_bundled import is_google_oauth_bundled, seed_google_oauth_settings
@@ -141,7 +141,10 @@ def create_app() -> Flask:
         process_expired_shares(store, cloud)
         folders = store.list_folders()
         shares = store.list_links()
-        update_info = check_for_update(store)
+        force_update = request.args.get("check_updates") in ("1", "true", "yes")
+        if force_update:
+            clear_update_cache(store)
+        update_info = check_for_update(store, force=force_update)
         return render_template(
             "dashboard.html",
             folders=folders,
@@ -151,6 +154,24 @@ def create_app() -> Flask:
             build_share_url=lambda link_id: build_share_url(BASE_URL, link_id),
             today_iso=date.today().isoformat(),
         )
+
+    @app.post("/updates/check")
+    def check_updates_route():
+        clear_update_cache(store)
+        info = check_for_update(store, force=True)
+        if info is None:
+            flash(
+                "Could not check for updates. Confirm the GitHub repo is public and has a Release.",
+                "error",
+            )
+        elif info.available:
+            flash(
+                f"Update available: v{info.latest_version}. See the banner on the dashboard.",
+                "success",
+            )
+        else:
+            flash(f"You are up to date (v{get_app_info()['app_version']}).", "success")
+        return redirect(url_for("dashboard"))
 
     @app.get("/settings/branding/<kind>.png")
     def branding_asset(kind: str):

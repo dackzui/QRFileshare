@@ -5,15 +5,19 @@ import os
 import time
 from dataclasses import dataclass
 from typing import Optional
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from database import DataStore
 from version_info import get_app_info, version_tuple
 
 CACHE_SETTING = "update_check_cache"
-CACHE_TTL_SECONDS = 6 * 60 * 60
+# Keep network checks light, but refresh often enough to notice new Releases.
+CACHE_TTL_SECONDS = 30 * 60
 USER_AGENT = "QRFileshare-UpdateCheck/1.0"
+
+# First dashboard open in this process always rechecks GitHub.
+_session_checked = False
 
 
 @dataclass
@@ -129,10 +133,21 @@ def _save_cache(store: DataStore, info: UpdateInfo, *, current_version: str, rep
     store.set_setting(CACHE_SETTING, json.dumps(payload))
 
 
+def clear_update_cache(store: DataStore) -> None:
+    store.set_setting(CACHE_SETTING, "")
+
+
 def check_for_update(store: DataStore, *, force: bool = False) -> Optional[UpdateInfo]:
+    global _session_checked
+
     repo = _github_repo()
     if not repo:
         return None
+
+    # Recheck GitHub once per app launch so new Releases appear without waiting.
+    if not _session_checked:
+        force = True
+        _session_checked = True
 
     if not force:
         cached = _load_cache(store)
@@ -142,7 +157,7 @@ def check_for_update(store: DataStore, *, force: bool = False) -> Optional[Updat
     current_version = str(get_app_info()["app_version"])
     try:
         release = _fetch_latest_release(repo)
-    except (URLError, TimeoutError, json.JSONDecodeError, OSError):
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
         return _load_cache(store)
 
     latest_version = _normalize_version(str(release.get("tag_name", "")))

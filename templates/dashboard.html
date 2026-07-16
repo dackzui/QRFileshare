@@ -23,6 +23,9 @@
     <h1>Share folders with expiring QR codes</h1>
     <p>Pick a cloud storage provider, sign in once, then create folders, drop files, and share with Canva-style QR codes. Default expiry: <strong>{{ format_duration(default_expiry_value, default_expiry_unit) }}</strong>.</p>
   </div>
+  <form method="post" action="{{ url_for('check_updates_route') }}" class="hero-update-check">
+    <button class="btn btn-ghost btn-sm" type="submit">Check for updates</button>
+  </form>
 </section>
 
 {% include "partials/cloud_panel.html" %}
